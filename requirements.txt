@@ -1,0 +1,38 @@
+
+torch
+torchvision
+torchaudio
+
+
+transformers
+tokenizers
+datasets
+huggingface-hub
+safetensors
+
+
+
+numpy
+pandas
+scipy
+scikit-learn 
+
+
+
+wandb 
+tqdm 
+
+
+
+peft                 # Required for applying LoRA adapters
+bitsandbytes         # Required for 4-bit model quantization (QLoRA)
+accelerate           # Hugging Face backend requirement for device mapping
+
+
+
+pose-format          # Required by dataloaders.py to read .pose files
+
+
+sacrebleu            # Required to calculate the SacreBLEU score
+rouge-score          # Required to calculate the ROUGE-L score
+openpyxl             # Required by pandas to save the metrics_summary.xlsx

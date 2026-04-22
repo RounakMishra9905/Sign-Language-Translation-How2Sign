@@ -1,0 +1,506 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{LLM-Based Sign Language Translation}
+\subtitle{From an Early RTMPoses Pipeline to a Better How2Sign Pose-to-English System}
+\author{Your Name}
+\institute{Your Department / College}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Introduction}
+\begin{itemize}
+  \item Sign language translation is an important task in accessibility and assistive AI.
+  \item The aim is to convert sign language input into meaningful natural language text.
+  \item In our project, we focused on training large language models for sign-to-English translation.
+  \item Our work progressed in two stages: an early RTMPoses-based pipeline and a later improved How2Sign pipeline.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Project Journey}
+\begin{itemize}
+  \item We did not reach the final pipeline in one step.
+  \item Our first implementation used an older RTMPoses-based setup and produced very poor results.
+  \item After studying the failure patterns, we redesigned the training setup.
+  \item We then built a better decoder-only LLM pipeline on the How2Sign dataset.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Problem Statement}
+\begin{itemize}
+  \item Given a sequence of pose features from sign language, generate the correct English sentence.
+  \item The challenge is not only language generation, but also multimodal alignment.
+  \item The model must connect body motion, hand movement, and temporal dynamics with text.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Main Objective}
+\begin{itemize}
+  \item Explore whether large language models can be adapted for sign language translation.
+  \item Build training pipelines that accept pose-based input and produce English output.
+  \item Compare multiple LLM backbones.
+  \item Study what failed in the first pipeline and what improved in the second one.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Project Context}
+\begin{itemize}
+  \item Our work was inspired by the PoseStich-SLT repository.
+  \item We used available support code and structure where useful.
+  \item Our main work focused on the training pipelines, experiments, predictions, and analysis.
+  \item The final better-performing setup used the How2Sign dataset.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Two Phases of Our Work}
+\begin{enumerate}
+  \item First phase: old RTMPoses-based implementation
+  \item Second phase: improved How2Sign pose-to-English LLM pipeline
+\end{enumerate}
+\vspace{0.5em}
+\begin{itemize}
+  \item The first phase helped us understand major failure modes.
+  \item The second phase gave better results and a cleaner multimodal pipeline.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Phase 1: Old RTMPoses-Based Setup}
+\begin{itemize}
+  \item The old implementation is stored in the folder \texttt{Sign-Language-Translation-old}.
+  \item It used RTMPoses-based pose features stored as \texttt{.pkl} files.
+  \item The pipeline was more generic and supported many model families.
+  \item This was our first serious attempt, but the results were extremely poor.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Pipeline Data Setup}
+\begin{itemize}
+  \item The old configs point to \texttt{rtmfeaturesisign} data paths.
+  \item Pose files were loaded from a performance directory using \texttt{.pkl} inputs.
+  \item The data loader used \texttt{266} input dimensions, corresponding to \texttt{133} joints with x and y coordinates.
+  \item The sequence length was reduced using frame skipping with \texttt{step\_frames = 4}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Pipeline Input Representation}
+\begin{itemize}
+  \item Each frame in the old pipeline used \texttt{266}-dimensional RTMPoses-based features.
+  \item The data loader handled variable pose lengths and padded them to a fixed limit.
+  \item Spatial normalization was added to stabilize training.
+  \item Gaussian noise augmentation was also supported.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Pipeline Model Design}
+\begin{itemize}
+  \item The old code used a universal model factory.
+  \item It supported both encoder-decoder models and decoder-only causal LMs.
+  \item A temporal feature projector was added before the language model.
+  \item LoRA-based fine-tuning was used for efficient adaptation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Pipeline Prompting Strategy}
+\begin{itemize}
+  \item The old model wrapper used prompt-style conditioning.
+  \item One prompt format was: \texttt{User: Translate the following sign language kinematics into an English sentence.}
+  \item The goal was to force the LLM into an instruction-following mode.
+  \item In practice, this still did not produce grounded translations.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Pipeline Training Setup}
+\begin{itemize}
+  \item Maximum frames were reduced to \texttt{75}.
+  \item Batch size was typically \texttt{4}.
+  \item Gradient accumulation was \texttt{4}.
+  \item Learning rate for the LLM was \texttt{5e-5}.
+  \item Projector learning rate was \texttt{1e-3}.
+  \item Evaluation was run every \texttt{2} epochs.
+  \item Beam search was turned off with \texttt{num\_beams = 1}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Models We Tried}
+\begin{itemize}
+  \item Qwen 1.5B
+  \item Phi 1.5
+  \item Llama 1B
+  \item Gemma 2B
+  \item Gemma 3 4B
+  \item Gemma 7B
+  \item Other configs were also prepared for larger models and seq2seq baselines
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Old Results Summary}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Model & Logged Best BLEU & Best Epoch \\
+\midrule
+qwen\_1.5b & 0.001147 & 22 \\
+phi\_1.5 & 0.001062 & 22 \\
+llama\_1b & 0.000707 & 28 \\
+gemma\_2b & 0.000403 & 4 \\
+gemma\_3\_4b & 0.000336 & 28 \\
+gemma\_7b & 0.000187 & 8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}{What These Old Results Mean}
+\begin{itemize}
+  \item The BLEU values were extremely close to zero.
+  \item This means the generated text had almost no meaningful overlap with the target translation.
+  \item Even when the output looked fluent, it was usually unrelated to the reference.
+  \item So the first pipeline clearly failed at semantic grounding.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qualitative Failure Pattern in the Old Pipeline}
+\begin{itemize}
+  \item Predictions often became long unrelated paragraphs.
+  \item Some outputs looked like random textbook explanations or news-style stories.
+  \item The model generated fluent language, but not faithful translation.
+  \item This showed that the LLM prior was dominating the pose signal.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Why the Old Pipeline Performed Poorly}
+\begin{itemize}
+  \item RTMPoses features alone were not enough to ground the translation well.
+  \item The generic prompting strategy did not solve the multimodal alignment problem.
+  \item The models learned to produce fluent generic text instead of correct target sentences.
+  \item Better data alignment and a cleaner pose-to-text setup were needed.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{What We Learned from Phase 1}
+\begin{itemize}
+  \item Bigger models do not automatically solve sign translation.
+  \item Prompting alone is not enough for strong multimodal grounding.
+  \item Pose feature design and data compatibility matter a lot.
+  \item We needed a better dataset setup and a more focused training pipeline.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Phase 2: Improved How2Sign Pipeline}
+\begin{itemize}
+  \item After the first failure, we moved to a cleaner How2Sign-based setup.
+  \item This became the main LLM training pipeline of our project.
+  \item The final scripts are \texttt{train\_how2sign\_llm.py} and \texttt{train\_how2sign\_llm\_A100.py}.
+  \item This pipeline gave clearly better results than the earlier RTMPoses setup.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Dataset Used in the Improved Pipeline}
+\begin{itemize}
+  \item The improved setup uses the How2Sign dataset.
+  \item How2Sign is a large-scale continuous American Sign Language dataset.
+  \item It contains aligned sign sequences and English sentence annotations.
+  \item In our pipeline, pose files were used as the model input and English text as the target output.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Why We Shifted to How2Sign}
+\begin{itemize}
+  \item The earlier setup was not giving meaningful translations.
+  \item We wanted a cleaner and better-aligned pose-to-English training setup.
+  \item How2Sign provided a more direct continuous sign translation setting.
+  \item This made it more suitable for our decoder-only LLM experiments.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Improved Pipeline Input Representation}
+\begin{itemize}
+  \item In the improved setup, each frame is represented using \texttt{152} values.
+  \item These come from \texttt{76} keypoints with x and y coordinates.
+  \item The keypoints include left hand, right hand, body, and face information.
+  \item This feature sequence becomes the pose input for the model.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Improved Pose Preprocessing}
+\begin{itemize}
+  \item Pose files are read and converted into frame-wise vectors.
+  \item Hand, body, and face features are combined into one sequence.
+  \item Sequences are padded or truncated to a fixed maximum number of frames.
+  \item Noise can be added during training for robustness.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Improved LLM Input Format}
+\begin{itemize}
+  \item A special token \texttt{<pose>} marks the start of the pose segment.
+  \item Placeholder slots are reserved for pose embeddings.
+  \item A special token \texttt{<English>} marks the beginning of the text segment.
+  \item The model is trained autoregressively to generate the English sentence.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Improved Prompt Strategy}
+\begin{itemize}
+  \item The improved training script uses the prompt: \texttt{Translate ASL to English:}
+  \item Prompt embeddings are inserted along with pose embeddings.
+  \item This is cleaner and better suited to instruction-tuned LLMs.
+  \item It fits more naturally into decoder-only generation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Improved Models We Trained}
+\begin{itemize}
+  \item Qwen2.5-1.5B
+  \item Qwen2.5-7B-Instruct
+  \item Meta-Llama-3.1-8B-Instruct
+  \item gemma-3-12b-it
+  \item Mistral-7B-Instruct-v0.3
+  \item Phi-4 based run
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Core Idea of the Improved Pipeline}
+\begin{itemize}
+  \item Pose features cannot directly be understood by an LLM.
+  \item So we added a learned feature projection module.
+  \item The projection maps pose features into the hidden space of the selected language model.
+  \item After this alignment, the model generates English conditioned on sign input.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feature Projection Module}
+\begin{itemize}
+  \item Spatial linear layer
+  \item Temporal convolution layer
+  \item GELU activation
+  \item Final output projection to the hidden size of the language model
+\end{itemize}
+\vspace{0.5em}
+This module is the bridge between pose representation and language generation.
+\end{frame}
+
+\begin{frame}{Improved Training Method}
+\begin{itemize}
+  \item Fine-tuning was done using LoRA.
+  \item The model was trained in bfloat16 precision.
+  \item Flash Attention 2 was enabled in the main script.
+  \item Gradient accumulation was used because of memory constraints.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Important Hyperparameters in the Improved Setup}
+\begin{table}
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+LLM learning rate & \texttt{5e-5} \\
+Projection learning rate & \texttt{1e-3} \\
+Maximum frames & \texttt{600} \\
+Maximum decoder length & \texttt{128} \\
+Batch size & \texttt{1} \\
+Gradient accumulation & \texttt{16} \\
+Epochs & \texttt{100} \\
+LoRA rank & \texttt{16} \\
+LoRA alpha & \texttt{32} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}{Outputs Saved in the Improved Pipeline}
+\begin{itemize}
+  \item Model checkpoints
+  \item Validation predictions
+  \item Test predictions
+  \item Metrics saved in Excel format
+\end{itemize}
+\vspace{0.5em}
+This allowed direct comparison across different LLM backbones and epochs.
+\end{frame}
+
+\begin{frame}{Evaluation Metrics}
+\begin{itemize}
+  \item BLEU-1
+  \item BLEU-4
+  \item SacreBLEU
+  \item ROUGE-L
+  \item Validation loss
+  \item Test loss
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Best Validation Results in the Improved Setup}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Model & BLEU-4 & SacreBLEU & ROUGE-L \\
+\midrule
+Qwen2.5-1.5B & 1.68 & 1.78 & 11.95 \\
+phi-4\_300 & 0.90 & 0.95 & 11.06 \\
+Meta-Llama-3.1-8B-Instruct & 0.83 & 0.96 & 9.63 \\
+Qwen2.5-7B-Instruct & 0.78 & 0.84 & 9.58 \\
+Mistral-7B-Instruct-v0.3\_300 & 0.63 & 0.70 & 5.34 \\
+gemma-3-12b-it & 0.17 & 0.21 & 6.94 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}{Comparison: Old vs Improved Pipeline}
+\begin{itemize}
+  \item Old RTMPoses pipeline best logged BLEU was around \texttt{0.0011}.
+  \item Improved How2Sign pipeline reached a validation BLEU-4 of \texttt{1.68}.
+  \item The improved setup was still challenging, but it was clearly much better.
+  \item This shows that dataset setup and multimodal design made a major difference.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Main Observation}
+\begin{itemize}
+  \item Qwen2.5-1.5B gave the best validation result among the improved runs.
+  \item Larger models did not automatically outperform smaller ones.
+  \item Better alignment mattered more than just more parameters.
+  \item Sign language translation remains a difficult grounding problem.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qualitative Findings in the Improved Setup}
+\begin{itemize}
+  \item The models generated more sentence-like English than in the old setup.
+  \item However, many outputs were still not fully faithful to the reference.
+  \item Some predictions were fluent but off-topic.
+  \item This means the system improved, but semantic grounding is still incomplete.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Strengths of Our Final Work}
+\begin{itemize}
+  \item We explored the problem in multiple stages instead of relying on one experiment.
+  \item We identified clear failure patterns in the old RTMPoses setup.
+  \item We redesigned the pipeline and achieved better results on How2Sign.
+  \item We generated predictions and metric summaries across multiple LLMs.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Limitations}
+\begin{itemize}
+  \item Even the improved results are still modest.
+  \item Fluent text does not always mean correct translation.
+  \item Pose-to-language alignment remains hard.
+  \item Better multimodal fusion and stronger supervision are still needed.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Future Work}
+\begin{itemize}
+  \item Improve the pose encoder and projection module.
+  \item Add stronger temporal modeling.
+  \item Explore cross-attention based fusion methods.
+  \item Use better data filtering and more detailed human evaluation.
+  \item Continue testing more LLMs with a unified training setup.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Future Work: Implementing SignBind-LLM}
+\begin{itemize}
+  \item Our next major direction is to implement ideas from the SignBind-LLM paper.
+  \item SignBind-LLM is a multi-stage modality fusion framework for sign language translation.
+  \item Instead of forcing one network to learn everything at once, it separates the problem into specialized parts.
+  \item This is important because natural signing contains multiple information streams that are not equally easy to model.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Why SignBind-LLM Matters for Our Project}
+\begin{itemize}
+  \item Our current pipeline mainly projects pose features into an LLM and directly generates English.
+  \item This works to some extent, but our results show that semantic grounding is still weak.
+  \item According to the SignBind-LLM paper, single-stream approaches often fail on high-speed fingerspelling and asynchronous non-manual facial cues.
+  \item Those are exactly the kinds of signals that can carry important names, places, and technical terms.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Core Idea of SignBind-LLM}
+\begin{itemize}
+  \item SignBind-LLM uses separate expert predictors for continuous signing, fingerspelling, and lipreading.
+  \item Each expert first converts its own modality into a token sequence.
+  \item These parallel token streams are then fused using a lightweight transformer.
+  \item The fused representation is finally passed to a large language model for sentence generation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{How We Plan to Use SignBind Ideas}
+\begin{itemize}
+  \item We want to move from a single-stream pose-to-LLM setup to a richer multi-stream architecture.
+  \item One stream can focus on general continuous signing features.
+  \item Another stream can focus on fingerspelling-like detailed hand motion.
+  \item Another stream can capture lip and facial information as non-manual cues.
+  \item After that, we can fuse these streams before final language generation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Expected Benefit of a SignBind-Style Pipeline}
+\begin{itemize}
+  \item Better handling of temporal misalignment between different visual cues.
+  \item Better modeling of fingerspelled words and named entities.
+  \item Better use of facial and lip information that standard pose-only setups may underuse.
+  \item Stronger grounding before the LLM stage, which may reduce generic hallucinated outputs.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{SignBind-LLM as Our Next Research Step}
+\begin{itemize}
+  \item Our current work gives us a strong baseline and shows the limitations of simple multimodal alignment.
+  \item The next step is not only to scale models, but to improve the architecture itself.
+  \item Implementing SignBind-LLM can help us test whether modality-specific experts improve translation quality.
+  \item So our future work is moving toward a more structured and high-fidelity multimodal translation system.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+  \item Our project evolved from a failed RTMPoses-based pipeline to a better How2Sign-based LLM translation system.
+  \item The first stage taught us what was not working.
+  \item The second stage gave better metrics, cleaner outputs, and a stronger pipeline.
+  \item Our next step is to extend this work with SignBind-LLM style multi-stage modality fusion.
+  \item Overall, the project shows both the difficulty and the promise of LLM-based sign language translation.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{References}
+\small
+\begin{itemize}
+  \item PoseStich-SLT repository: \url{https://github.com/Exploration-Lab/PoseStich-SLT}
+  \item How2Sign dataset: \url{https://how2sign.github.io/}
+  \item SignBind-LLM paper: \url{https://arxiv.org/abs/2509.00030}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Thank You}
+\centering
+\Large Thank You\\[1em]
+\normalsize Questions and Discussion
+\end{frame}
+
+\end{document}
